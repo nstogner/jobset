@@ -19,6 +19,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"sync"
@@ -699,6 +700,10 @@ func constructJob(js *jobset.JobSet, rjob *jobset.ReplicatedJob, jobIdx int) (*b
 		job.Spec.Template.Spec.NodeSelector = make(map[string]string)
 	}
 	job.Spec.Template.Spec.NodeSelector["job-key"] = jobHashKey(js.Namespace, job.Name)
+	if os.Getenv("FORCE_ON_DEMAND") == "true" {
+		delete(job.Spec.Template.Spec.NodeSelector, "cloud.google.com/reservation-name")
+		delete(job.Spec.Template.Spec.NodeSelector, "cloud.google.com/gke-spot")
+	}
 
 	return job, nil
 }
