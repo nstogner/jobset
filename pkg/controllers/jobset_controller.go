@@ -19,6 +19,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"sync"
@@ -684,6 +685,26 @@ func constructJob(js *jobset.JobSet, rjob *jobset.ReplicatedJob, jobIdx int) (*b
 	// if Suspend is set, then we assume all jobs will be suspended also.
 	jobsetSuspended := jobSetSuspended(js)
 	job.Spec.Suspend = ptr.To(jobsetSuspended)
+
+	// Temporary: add nodeSelector for jobkey for NAP use case where we don't want jobs
+	// swapping between node pools between JobSet restarts.
+	if job.Spec.Template.Spec.NodeSelector == nil {
+		job.Spec.Template.Spec.NodeSelector = make(map[string]string)
+	}
+	job.Spec.Template.Spec.NodeSelector["job-key"] = jobHashKey(js.Namespace, job.Name)
+
+	// Remove reservation and spot nodeselectors if force on demand flag is set.
+	if os.Getenv("FORCE_ON_DEMAND") == "true" {
+		delete(job.Spec.Template.Spec.NodeSelector, "cloud.google.com/reservation-name")
+		delete(job.Spec.Template.Spec.NodeSelector, "cloud.google.com/gke-spot")
+	}
+
+	// Set reservation location hint if specified.
+	_, usingReservation := job.Spec.Template.Spec.NodeSelector["cloud.google.com/reservation-name"]
+	locationHint := os.Getenv("RESERVATION_LOCATION_HINT")
+	if usingReservation && locationHint != "" {
+		job.Spec.Template.Spec.NodeSelector["cloud.google.com/gke-location-hint"] = locationHint
+	}
 
 	return job, nil
 }
