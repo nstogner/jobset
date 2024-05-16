@@ -700,9 +700,8 @@ func constructJob(js *jobset.JobSet, rjob *jobset.ReplicatedJob, jobIdx int) (*b
 	}
 
 	// Set reservation location hint if specified.
-	_, usingReservation := job.Spec.Template.Spec.NodeSelector["cloud.google.com/reservation-name"]
 	locationHint := os.Getenv("RESERVATION_LOCATION_HINT")
-	if usingReservation && locationHint != "" {
+	if locationHint != "" {
 		job.Spec.Template.Spec.NodeSelector["cloud.google.com/gke-location-hint"] = locationHint
 	}
 
