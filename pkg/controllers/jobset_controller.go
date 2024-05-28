@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"time"
 
 	"k8s.io/utils/clock"
 
@@ -699,10 +700,20 @@ func constructJob(js *jobset.JobSet, rjob *jobset.ReplicatedJob, jobIdx int) (*b
 		delete(job.Spec.Template.Spec.NodeSelector, "cloud.google.com/gke-spot")
 	}
 
+	alwaysHintTime, err := time.Parse(time.RFC3339, os.Getenv("ALWAYS_HINT_TIME"))
+	if err != nil {
+		return nil, err
+	}
+
 	// Set reservation location hint if specified.
 	locationHint := os.Getenv("RESERVATION_LOCATION_HINT")
+	_, usingReservation := job.Spec.Template.Spec.NodeSelector["cloud.google.com/reservation-name"]
 	if locationHint != "" {
-		job.Spec.Template.Spec.NodeSelector["cloud.google.com/gke-location-hint"] = locationHint
+		if js.ObjectMeta.CreationTimestamp.After(alwaysHintTime) {
+			job.Spec.Template.Spec.NodeSelector["cloud.google.com/gke-location-hint"] = locationHint
+		} else if usingReservation {
+			job.Spec.Template.Spec.NodeSelector["cloud.google.com/gke-location-hint"] = locationHint
+		}
 	}
 
 	return job, nil
