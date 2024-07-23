@@ -23,7 +23,6 @@ import (
 	"sort"
 	"strconv"
 	"sync"
-	"time"
 
 	"k8s.io/utils/clock"
 
@@ -694,26 +693,14 @@ func constructJob(js *jobset.JobSet, rjob *jobset.ReplicatedJob, jobIdx int) (*b
 	}
 	job.Spec.Template.Spec.NodeSelector["job-key"] = jobHashKey(js.Namespace, job.Name)
 
-	// Remove reservation and spot nodeselectors if force on demand flag is set.
+	// Remove reservation and nodeSelectors if force on demand flag is set.
 	if os.Getenv("FORCE_ON_DEMAND") == "true" {
 		delete(job.Spec.Template.Spec.NodeSelector, "cloud.google.com/reservation-name")
-		delete(job.Spec.Template.Spec.NodeSelector, "cloud.google.com/gke-spot")
 	}
 
-	alwaysHintTime, err := time.Parse(time.RFC3339, os.Getenv("ALWAYS_HINT_TIME"))
-	if err != nil {
-		return nil, err
-	}
-
-	// Set reservation location hint if specified.
-	locationHint := os.Getenv("RESERVATION_LOCATION_HINT")
-	_, usingReservation := job.Spec.Template.Spec.NodeSelector["cloud.google.com/reservation-name"]
-	if locationHint != "" {
-		if js.ObjectMeta.CreationTimestamp.After(alwaysHintTime) {
-			job.Spec.Template.Spec.NodeSelector["cloud.google.com/gke-location-hint"] = locationHint
-		} else if usingReservation {
-			job.Spec.Template.Spec.NodeSelector["cloud.google.com/gke-location-hint"] = locationHint
-		}
+	// Set location hint if specified.
+	if locationHint := os.Getenv("RESERVATION_LOCATION_HINT"); locationHint != "" {
+		job.Spec.Template.Spec.NodeSelector["cloud.google.com/gke-location-hint"] = locationHint
 	}
 
 	return job, nil
